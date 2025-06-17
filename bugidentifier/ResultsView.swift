@@ -1,149 +1,173 @@
 import SwiftUI
 
+import SwiftUI
+
+// Helper for Serif Font (if not using a custom font added to project)
+// For a true "sharp, black serif" feel, you might need to embed a specific font file.
+// Georgia is a commonly available serif font.
+struct SerifText: View {
+    let text: String
+    let size: CGFloat
+    let color: Color
+
+    init(_ text: String, size: CGFloat = 28, color: Color = ThemeColors.serifText) {
+        self.text = text
+        self.size = size
+        self.color = color
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.custom("Georgia-Bold", size: size)) // Example serif font
+            .foregroundColor(color)
+    }
+}
+
 struct ResultsView: View {
-    let identifiedBugName: String
-    let confidence: Double
-    let description: String // Placeholder for more detailed info
-    let habitat: String // Placeholder
-    let isPoisonous: Bool // Placeholder
+    @Environment(\.presentationMode) var presentationMode
+    let result: BugIdentificationResult
     let imageUrl: UIImage? // To display the image that was analyzed
 
-    init(identifiedBugName: String, confidence: Double, imageUrl: UIImage?, description: String = "This is a placeholder description for the identified bug. More details would come from the API.", habitat: String = "Commonly found in gardens and forests.", isPoisonous: Bool = false) {
-        self.identifiedBugName = identifiedBugName
-        self.confidence = confidence
+    init(result: BugIdentificationResult, imageUrl: UIImage?) {
+        self.result = result
         self.imageUrl = imageUrl
-        self.description = description
-        self.habitat = habitat
-        self.isPoisonous = isPoisonous
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Bug Identified!")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity, alignment: .center)
+        ZStack(alignment: .top) {
+            // Layer 1: Background Image (extends to top edge)
+            if let imageUrl = imageUrl {
+                Image(uiImage: imageUrl)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: UIScreen.main.bounds.width)
+                    .ignoresSafeArea()
+            } else {
+                ThemeColors.background.ignoresSafeArea()
+            }
 
-                if let imageUrl = imageUrl {
-                    Image(uiImage: imageUrl)
-                        .resizable()
-                        .scaledToFit()
-                        .cornerRadius(12)
-                        .shadow(radius: 5)
-                        .padding(.horizontal)
-                }
+            // Layer 2: Scrollable Content
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack {
+                    // This spacer creates the hero image area, pushing the card down.
+                    // The height determines how much of the image is shown above the card.
+                    Spacer()
+                        .frame(height: 250)
 
-                CardView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(identifiedBugName)
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        HStack {
-                            Text("Confidence:")
-                                .font(.headline)
-                            ProgressView(value: confidence, total: 1.0)
-                                .progressViewStyle(LinearProgressViewStyle(tint: confidenceColor(confidence)))
-                                .frame(height: 10)
-                            Text(String(format: "%.0f%%", confidence * 100))
-                                .font(.headline)
+                    // Information Card
+                    VStack(alignment: .center, spacing: 20) {
+                        SerifText(result.name, size: 32)
+                        
+                        Text(result.description)
+                            .font(.system(.body, design: .default))
+                            .foregroundColor(ThemeColors.primaryText)
+                            .lineLimit(nil)
+                            .multilineTextAlignment(.center)
+                        
+                        Divider().background(ThemeColors.accent)
+                        
+                        InfoRow(iconName: "leaf.fill", title: "Habitat", value: result.habitat)
+                        
+                        Divider().background(ThemeColors.accent)
+                        
+                        InfoRow(iconName: result.isPoisonous ? "exclamationmark.triangle.fill" : "checkmark.shield.fill",
+                                title: "Poisonous to Humans",
+                                value: result.isPoisonous ? "Yes" : "No",
+                                valueColor: result.isPoisonous ? .red : ThemeColors.primaryText)
+                    }
+                    .padding(25)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(ThemeColors.cardBackground)
+                    .cornerRadius(20)
+                    .shadow(color: ThemeColors.primaryText.opacity(0.1), radius: 10, x: 0, y: 5)
+                    .padding(.horizontal)
+                    
+                    // This spacer pushes the card to the top and the button to the bottom
+                    Spacer()
+                    
+                    // Button is wrapped in a VStack for stable layout
+                    VStack {
+                        Button(action: {
+                            self.presentationMode.wrappedValue.dismiss()
+                        }) {
+                            Text("Identify Another Bug")
+                                .font(.system(.headline, design: .default))
+                                .fontWeight(.semibold)
+                                .foregroundColor(ThemeColors.background)
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(ThemeColors.primaryText)
+                                .cornerRadius(12)
                         }
                     }
-                }
-
-                CardView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Description")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Text(description)
-                            .font(.body)
-                    }
-                }
-                
-                CardView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Habitat")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Text(habitat)
-                            .font(.body)
-                    }
-                }
-                
-                CardView {
-                    HStack {
-                        Text("Poisonous:")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                        Spacer()
-                        Text(isPoisonous ? "Yes" : "No")
-                            .font(.headline)
-                            .foregroundColor(isPoisonous ? .red : .green)
-                        Image(systemName: isPoisonous ? "exclamationmark.triangle.fill" : "checkmark.shield.fill")
-                            .foregroundColor(isPoisonous ? .red : .green)
-                    }
-                }
-                
-                Spacer()
-
-                Button(action: {
-                    // Action to go back or start a new identification
-                    // This might involve a callback or environment object to reset the state
-                }) {
-                    Text("Identify Another Bug")
-                        .font(.headline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .cornerRadius(10)
-                        .padding(.horizontal)
+                    .padding(.horizontal, 25)
+                    .padding(.bottom, 30)
                 }
             }
-            .padding()
         }
-        .navigationTitle("Identification Result")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private func confidenceColor(_ confidence: Double) -> Color {
-        if confidence > 0.75 {
-            return .green
-        } else if confidence > 0.5 {
-            return .orange
-        } else {
-            return .red
+        .toolbar {
+            // Custom back button if needed, for better contrast on transparent bar
+            ToolbarItem(placement: .navigationBarLeading) {
+                // Add custom back button here if default is hard to see
+            }
+        }
+        .onAppear {
+            // Make navigation bar transparent
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithTransparentBackground()
+            UINavigationBar.appearance().standardAppearance = appearance
+            UINavigationBar.appearance().scrollEdgeAppearance = appearance
+            UINavigationBar.appearance().compactAppearance = appearance
         }
     }
 }
 
-struct CardView<Content: View>: View {
-    let content: Content
-    
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-    
+// Helper view for consistent info rows
+struct InfoRow: View {
+    let iconName: String
+    let title: String
+    let value: String
+    var valueColor: Color = ThemeColors.primaryText
+
     var body: some View {
-        content
-            .padding()
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(12)
-            .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 10) {
+                Image(systemName: iconName)
+                    .font(.title3)
+                    .foregroundColor(ThemeColors.accent)
+                    .frame(width: 25, alignment: .center)
+                Text(title)
+                    .font(.system(.headline, design: .default))
+                    .fontWeight(.medium)
+                    .foregroundColor(ThemeColors.primaryText)
+            }
+            Text(value)
+                .font(.system(.subheadline, design: .default))
+                .foregroundColor(valueColor)
+                .padding(.leading, 35) // Align with text, not icon
+        }
     }
 }
+
+// Remove old confidenceColor and CardView as they are replaced by new theme
+// struct CardView<Content: View> ... (Removed)
+// private func confidenceColor ... (Removed)
+
 
 struct ResultsView_Previews: PreviewProvider {
     static var previews: some View {
+        let sampleResult = BugIdentificationResult(
+            name: "Ladybug",
+            description: "Ladybugs are generally considered useful insects, as many species prey on aphids or scale insects, which are pests in gardens, agricultural fields, orchards, and similar places.",
+            habitat: "Fields, forests, gardens, and sometimes homes.",
+            isPoisonous: false
+        )
+        
         NavigationView {
-            ResultsView(identifiedBugName: "Ladybug", 
-                        confidence: 0.88, 
-                        imageUrl: UIImage(systemName: "ladybug"),
-                        description: "Ladybugs are generally considered useful insects, as many species prey on aphids or scale insects, which are pests in gardens, agricultural fields, orchards, and similar places.",
-                        habitat: "Fields, forests, gardens, and sometimes homes.",
-                        isPoisonous: false
+            ResultsView(result: sampleResult, 
+                        imageUrl: UIImage(systemName: "ladybug")
             )
         }
     }

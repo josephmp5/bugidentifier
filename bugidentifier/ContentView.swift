@@ -12,7 +12,7 @@ struct ContentView: View {
 
     var body: some View {
         if isOnboardingComplete {
-            CameraGalleryView()
+            MainTabView()
         } else {
             OnboardingView(isOnboardingComplete: $isOnboardingComplete)
         }

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AE58BE0C2E00B507001114FB /* ReceiptParser in Frameworks */ = {isa = PBXBuildFile; productRef = AE58BE0B2E00B507001114FB /* ReceiptParser */; };
+		AE58BE0E2E00B507001114FB /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = AE58BE0D2E00B507001114FB /* RevenueCat */; };
 		AE610B2A2DFF76E50036E1F7 /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = AE610B292DFF76E50036E1F7 /* FirebaseAI */; };
 		AE610B2C2DFF76E50036E1F7 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = AE610B2B2DFF76E50036E1F7 /* FirebaseAnalytics */; };
 		AE610B2E2DFF76E50036E1F7 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = AE610B2D2DFF76E50036E1F7 /* FirebaseAnalyticsCore */; };
@@ -92,6 +94,7 @@
 				AE610B442DFF76E50036E1F7 /* FirebaseDynamicLinks in Frameworks */,
 				AE610B542DFF76E50036E1F7 /* FirebaseMLModelDownloader in Frameworks */,
 				AE610B322DFF76E50036E1F7 /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
+				AE58BE0C2E00B507001114FB /* ReceiptParser in Frameworks */,
 				AE610B3A2DFF76E50036E1F7 /* FirebaseAuth in Frameworks */,
 				AE610B522DFF76E50036E1F7 /* FirebaseMessaging in Frameworks */,
 				AE610B462DFF76E50036E1F7 /* FirebaseFirestore in Frameworks */,
@@ -99,6 +102,7 @@
 				AE610B482DFF76E50036E1F7 /* FirebaseFirestoreCombine-Community in Frameworks */,
 				AE610B4E2DFF76E50036E1F7 /* FirebaseInAppMessaging-Beta in Frameworks */,
 				AE610B4C2DFF76E50036E1F7 /* FirebaseFunctionsCombine-Community in Frameworks */,
+				AE58BE0E2E00B507001114FB /* RevenueCat in Frameworks */,
 				AE610B5C2DFF76E50036E1F7 /* FirebaseStorageCombine-Community in Frameworks */,
 				AE610B582DFF76E50036E1F7 /* FirebaseRemoteConfig in Frameworks */,
 				AE610B362DFF76E50036E1F7 /* FirebaseAppCheck in Frameworks */,
@@ -204,6 +208,10 @@
 				AE610B592DFF76E50036E1F7 /* FirebaseStorage */,
 				AE610B5B2DFF76E50036E1F7 /* FirebaseStorageCombine-Community */,
 				AE610B5D2DFF76E50036E1F7 /* FirebaseVertexAI */,
+				AE58BE0B2E00B507001114FB /* ReceiptParser */,
+				AE58BE0D2E00B507001114FB /* RevenueCat */,
+				AE58BE0F2E00B507001114FB /* RevenueCatUI */,
+				AE58BE112E00B507001114FB /* RevenueCat_CustomEntitlementComputation */,
 			);
 			productName = bugidentifier;
 			productReference = AE610AF52DFF5D710036E1F7 /* bugidentifier.app */;
@@ -289,6 +297,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AE610B212DFF6C650036E1F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				AE58BE0A2E00B507001114FB /* XCRemoteSwiftPackageReference "purchases-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AE610AF62DFF5D710036E1F7 /* Products */;
@@ -657,6 +666,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		AE58BE0A2E00B507001114FB /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.28.1;
+			};
+		};
 		AE610B212DFF6C650036E1F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
@@ -668,6 +685,26 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		AE58BE0B2E00B507001114FB /* ReceiptParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE58BE0A2E00B507001114FB /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = ReceiptParser;
+		};
+		AE58BE0D2E00B507001114FB /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE58BE0A2E00B507001114FB /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat;
+		};
+		AE58BE0F2E00B507001114FB /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE58BE0A2E00B507001114FB /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCatUI;
+		};
+		AE58BE112E00B507001114FB /* RevenueCat_CustomEntitlementComputation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE58BE0A2E00B507001114FB /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat_CustomEntitlementComputation;
+		};
 		AE610B292DFF76E50036E1F7 /* FirebaseAI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AE610B212DFF6C650036E1F7 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;

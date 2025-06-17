@@ -6,6 +6,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
   func application(_ application: UIApplication,
                    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
     FirebaseApp.configure()
+    // Initialize Remote Config Manager to start fetching the key
+    _ = RemoteConfigManager.shared
     return true
   }
 }
