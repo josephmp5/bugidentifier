@@ -21,11 +21,9 @@ struct CameraGalleryView: View {
     var body: some View {
         ZStack {
             NavigationView {
-                VStack(spacing: 25) {
-                    Text(greeting)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(Color.themeText)
-                        .padding(.top, 20)
+                VStack(spacing: 20) { // Adjusted main spacing
+                    SerifText(greeting, size: 30, color: ThemeColors.primaryText)
+                        .padding(.top, 30) // More top padding for title
 
                     Spacer()
 
@@ -38,14 +36,16 @@ struct CameraGalleryView: View {
                     Spacer()
 
                     ActionButtonsView(showingCamera: $showingCamera, selectedItem: $selectedItem)
+                        .padding(.horizontal, 30)
                     
                     if inputImage != nil {
                         PrimaryButton(title: "Identify Bug", action: performIdentification)
-                            .padding(.horizontal, 40)
+                            .padding(.horizontal, 30) // Consistent horizontal padding
+                            .padding(.top, 10) // Space between action buttons and identify button
                             .disabled(isIdentifying)
                     }
                     
-                    Spacer().frame(height: 20)
+                    Spacer().frame(height: 10) // Small spacer at bottom
                     
                     // Navigation is triggered by identificationResult being set
                     if let result = identificationResult {
@@ -60,7 +60,7 @@ struct CameraGalleryView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.themeBackground.edgesIgnoringSafeArea(.all))
+                .background(ThemeColors.background.edgesIgnoringSafeArea(.all))
                 .navigationBarHidden(true)
                 .fullScreenCover(isPresented: $showingCamera) {
                     ImagePicker(sourceType: .camera, selectedImage: $inputImage)
@@ -142,36 +142,33 @@ struct ImagePreview: View {
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: 350)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: Color.black.opacity(0.2), radius: 8, y: 4)
+                .shadow(color: ThemeColors.primaryText.opacity(0.15), radius: 8, y: 4) // Softer shadow
                 .padding(.horizontal, 30)
 
             Button(action: onClear) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.title)
-                    .foregroundColor(.white)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(Circle())
+                    .font(.system(size: 30))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(ThemeColors.background, ThemeColors.primaryText.opacity(0.7))
             }
-            .padding(8)
-            .offset(x: -25, y: 5) // Adjust offset to be on the image corner
+            .padding(10) // Adjusted padding for tap area
         }
     }
 }
 
 struct PlaceholderImageView: View {
     var body: some View {
-        VStack {
-            Image(systemName: "photo.on.rectangle.angled")
+        VStack(spacing: 15) {
+            Image(systemName: "photo.circle.fill")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 180)
-                .foregroundColor(Color.themeSecondaryText.opacity(0.5))
-            Text("Select an image to identify")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(Color.themeSecondaryText)
-                .padding(.top, 10)
+                .frame(width: 100, height: 100)
+                .foregroundColor(ThemeColors.accent.opacity(0.4))
+            Text("Tap to Select an Image")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(ThemeColors.primaryText.opacity(0.7))
         }
-        .frame(maxWidth: .infinity, maxHeight: 350)
+        .frame(maxWidth: .infinity, maxHeight: 300)
         .padding(.horizontal, 30)
     }
 }
@@ -181,7 +178,7 @@ struct ActionButtonsView: View {
     @Binding var selectedItem: PhotosPickerItem?
 
     var body: some View {
-        HStack(spacing: 20) {
+        VStack(spacing: 15) {
             ActionButton(iconName: "camera.fill", title: "Take Photo") {
                 showingCamera = true
             }
@@ -190,7 +187,7 @@ struct ActionButtonsView: View {
                 ActionButtonContent(iconName: "photo.fill.on.rectangle.fill", title: "Choose from Gallery")
             }
         }
-        .padding(.horizontal, 40)
+        // Horizontal padding moved to call site in CameraGalleryView's main VStack
     }
 }
 
@@ -211,19 +208,22 @@ struct ActionButtonContent: View {
     let title: String
 
     var body: some View {
-        VStack(spacing: 8) {
+        HStack(spacing: 15) {
             Image(systemName: iconName)
-                .font(.system(size: 28, weight: .medium))
-                .foregroundColor(Color.appThemePrimary)
+                .font(.system(size: 22, weight: .medium))
+                .foregroundColor(ThemeColors.accent)
+                .frame(width: 25) // Align icons
             Text(title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(Color.themeText)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(ThemeColors.primaryText)
+            Spacer()
         }
         .padding()
-        .frame(maxWidth: .infinity, minHeight: 100)
-        .background(Color.themeSecondaryBackground)
+        .frame(maxWidth: .infinity)
+        .frame(height: 65)
+        .background(ThemeColors.cardBackground)
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, y: 2)
+        .shadow(color: ThemeColors.primaryText.opacity(0.08), radius: 5, y: 2)
     }
 }
 
@@ -234,14 +234,13 @@ struct PrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding()
+                .font(.system(size: 18, weight: .bold, design: .default))
+                .foregroundColor(ThemeColors.background)
+                .padding(.vertical, 15)
                 .frame(maxWidth: .infinity)
-                .background(Color.appThemePrimary)
+                .background(ThemeColors.primaryText)
                 .cornerRadius(12)
-                .shadow(color: Color.appThemePrimary.opacity(0.4), radius: 8, y: 4)
+                .shadow(color: ThemeColors.primaryText.opacity(0.3), radius: 8, y: 4)
         }
     }
 }

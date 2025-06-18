@@ -7,6 +7,13 @@ struct BugIdentificationResult: Decodable {
     let description: String
     let habitat: String
     let isPoisonous: Bool
+    let family: String?
+    // Taxonomy
+    let scientificName: String?
+    let order: String?
+    // Biology & Behavior
+    let diet: String?
+    let lifeCycle: String?
 }
 
 // MARK: - Gemini API Service
@@ -102,7 +109,7 @@ class GeminiAPIService: ObservableObject {
         // 2. Construct the request body
         let prompt = """
         Identify the insect in this image. Provide its common name, a brief description of its key features, its typical habitat, and whether it is poisonous to humans.
-        Format the response as a single, clean JSON object with the following keys: 'name' (string), 'description' (string), 'habitat' (string), and 'isPoisonous' (boolean).
+        Format the response as a single, clean JSON object with the following keys: 'name' (string), 'description' (string), 'family' (string), 'scientificName' (string), 'order' (string), 'habitat' (string), 'diet' (string), 'lifeCycle' (string), and 'isPoisonous' (boolean). All keys except for name, description, habitat, and isPoisonous are optional if the information is not available.
         Do not include any other text or markdown formatting like ```json before or after the JSON object.
         """
         

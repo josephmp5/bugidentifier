@@ -55,21 +55,36 @@ struct ResultsView: View {
                         .frame(height: 250)
 
                     // Information Card
-                    VStack(alignment: .center, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 15) {
                         SerifText(result.name, size: 32)
+                            .frame(maxWidth: .infinity, alignment: .center)
                         
                         Text(result.description)
                             .font(.system(.body, design: .default))
                             .foregroundColor(ThemeColors.primaryText)
                             .lineLimit(nil)
-                            .multilineTextAlignment(.center)
+                            .multilineTextAlignment(.leading)
                         
-                        Divider().background(ThemeColors.accent)
+                        Divider().padding(.vertical, 5)
                         
+                        // Taxonomy Section
+                        SectionHeader(title: "Taxonomy")
+                        InfoRow(iconName: "text.book.closed.fill", title: "Scientific Name", value: result.scientificName)
+                        InfoRow(iconName: "person.3.sequence.fill", title: "Family", value: result.family)
+                        InfoRow(iconName: "list.bullet.indent", title: "Order", value: result.order)
+                        
+                        Divider().padding(.vertical, 5)
+                        
+                        // Ecology & Behavior Section
+                        SectionHeader(title: "Ecology & Behavior")
                         InfoRow(iconName: "leaf.fill", title: "Habitat", value: result.habitat)
-                        
-                        Divider().background(ThemeColors.accent)
-                        
+                        InfoRow(iconName: "fork.knife", title: "Diet", value: result.diet)
+                        InfoRow(iconName: "arrow.2.circlepath", title: "Life Cycle", value: result.lifeCycle)
+
+                        Divider().padding(.vertical, 5)
+
+                        // Human Interaction Section
+                        SectionHeader(title: "Human Interaction")
                         InfoRow(iconName: result.isPoisonous ? "exclamationmark.triangle.fill" : "checkmark.shield.fill",
                                 title: "Poisonous to Humans",
                                 value: result.isPoisonous ? "Yes" : "No",
@@ -125,28 +140,41 @@ struct ResultsView: View {
 }
 
 // Helper view for consistent info rows
+struct SectionHeader: View {
+    let title: String
+    var body: some View {
+        Text(title)
+            .font(.system(size: 20, weight: .bold, design: .rounded))
+            .foregroundColor(ThemeColors.primaryText)
+            .padding(.bottom, 5)
+    }
+}
+
 struct InfoRow: View {
     let iconName: String
     let title: String
-    let value: String
+    let value: String?
     var valueColor: Color = ThemeColors.primaryText
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 10) {
-                Image(systemName: iconName)
-                    .font(.title3)
-                    .foregroundColor(ThemeColors.accent)
-                    .frame(width: 25, alignment: .center)
-                Text(title)
-                    .font(.system(.headline, design: .default))
-                    .fontWeight(.medium)
-                    .foregroundColor(ThemeColors.primaryText)
+        if let value = value, !value.isEmpty {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 10) {
+                    Image(systemName: iconName)
+                        .font(.body)
+                        .foregroundColor(ThemeColors.accent)
+                        .frame(width: 25, alignment: .center)
+                    Text(title)
+                        .font(.system(.headline, design: .default))
+                        .fontWeight(.medium)
+                        .foregroundColor(ThemeColors.primaryText)
+                }
+                Text(value)
+                    .font(.system(.body, design: .default))
+                    .foregroundColor(valueColor)
+                    .padding(.leading, 35) // Align with text, not icon
             }
-            Text(value)
-                .font(.system(.subheadline, design: .default))
-                .foregroundColor(valueColor)
-                .padding(.leading, 35) // Align with text, not icon
+            .padding(.bottom, 10)
         }
     }
 }
@@ -162,7 +190,12 @@ struct ResultsView_Previews: PreviewProvider {
             name: "Ladybug",
             description: "Ladybugs are generally considered useful insects, as many species prey on aphids or scale insects, which are pests in gardens, agricultural fields, orchards, and similar places.",
             habitat: "Fields, forests, gardens, and sometimes homes.",
-            isPoisonous: false
+            isPoisonous: false,
+            family: "Coccinellidae",
+            scientificName: "Coccinella septempunctata",
+            order: "Coleoptera",
+            diet: "Aphids, scale insects, and other small pests.",
+            lifeCycle: "Complete metamorphosis: egg, larva, pupa, and adult."
         )
         
         NavigationView {
