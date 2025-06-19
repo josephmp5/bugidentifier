@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import FirebaseFunctions
 
 struct CameraGalleryView: View {
     // Image & Navigation State
@@ -13,6 +14,10 @@ struct CameraGalleryView: View {
     @State private var identificationResult: BugIdentificationResult?
     @State private var errorMessage: String?
     @State private var showErrorAlert = false
+
+    // Token & Paywall State
+    @EnvironmentObject private var userManager: UserManager
+    @State private var showPaywall = false
 
     private var greeting: String {
         return "Identify a New Bug"
@@ -84,6 +89,9 @@ struct CameraGalleryView: View {
                 dismissButton: .default(Text("OK"))
             )
         }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+        }
     }
 
     private func clearImage() {
@@ -102,24 +110,58 @@ struct CameraGalleryView: View {
     }
 
     private func performIdentification() {
+        guard let user = userManager.user else {
+            print("User data not available yet. Cannot perform identification.")
+            errorMessage = "Could not verify your user profile. Please check your connection and try again."
+            showErrorAlert = true
+            return
+        }
+
+        // If user is not premium and has no tokens, show paywall immediately.
+        if !user.hasAccess {
+            showPaywall = true
+            return
+        }
+
+        // User has access (is premium or has tokens), so try to consume one.
+        userManager.consumeToken { result in
+            switch result {
+            case .success:
+                // Token consumed successfully (or user is premium), proceed with identification.
+                self.identifyImage()
+            case .failure(let error):
+                if let nsError = error as NSError?,
+                   nsError.domain == "com.google.firebase.functions",
+                   nsError.code == Functions.FunctionsErrorCode.failedPrecondition.rawValue {
+                    // This specific error means the user is out of tokens.
+                    self.showPaywall = true
+                } else {
+                    // Handle other errors (e.g., network issues)
+                    self.errorMessage = "An error occurred: \(error.localizedDescription)"
+                    self.showErrorAlert = true
+                }
+            }
+        }
+    }
+
+    private func identifyImage() {
         guard let image = inputImage else { return }
 
         Task {
             isIdentifying = true
             do {
                 let result = try await GeminiAPIService.shared.identifyBug(from: image)
-                
+
                 // Save to history on success
                 if let imageData = image.jpegData(compressionQuality: 0.8) {
                     HistoryManager.shared.add(imageData: imageData, bugName: result.name)
                 }
-                
+
                 // Set result and trigger navigation
                 DispatchQueue.main.async {
                     self.identificationResult = result
                     self.navigateToResults = true
                 }
-
             } catch {
                 self.errorMessage = error.localizedDescription
                 self.showErrorAlert = true

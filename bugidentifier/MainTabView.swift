@@ -1,17 +1,35 @@
 import SwiftUI
 
 struct MainTabView: View {
-    var body: some View {
-        TabView {
-            CameraGalleryView()
-                .tabItem {
-                    Label("Identify", systemImage: "camera.viewfinder")
-                }
+    @State private var showPaywall = false
 
-            HistoryView()
-                .tabItem {
-                    Label("History", systemImage: "clock.fill")
+    var body: some View {
+        NavigationStack {
+            TabView {
+                CameraGalleryView()
+                    .tabItem {
+                        Label("Identify", systemImage: "camera.viewfinder")
+                    }
+
+                HistoryView()
+                    .tabItem {
+                        Label("History", systemImage: "clock.fill")
+                    }
+            }
+            .navigationTitle("Bug Identifier")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showPaywall = true
+                    }) {
+                        Image(systemName: "crown.fill")
+                    }
                 }
+            }
+            .fullScreenCover(isPresented: $showPaywall) {
+                PaywallView()
+            }
         }
         .accentColor(.appThemePrimary)
     }
@@ -20,5 +38,6 @@ struct MainTabView: View {
 struct MainTabView_Previews: PreviewProvider {
     static var previews: some View {
         MainTabView()
+            .environmentObject(PurchasesManager.shared) // For previewing
     }
 }

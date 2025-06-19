@@ -89,14 +89,9 @@ struct PaywallView: View {
                                     .foregroundColor(.gray)
                             }
                         } else {
-                            HStack {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.gray.opacity(0.5))
-                                Text("Closing in \(countdown)...")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
+                            // Show nothing or a disabled, non-interactive element until canDismiss is true
+                            // For simplicity, we'll show nothing, effectively hiding the button area.
+                            EmptyView()
                         }
                     }
                 }
@@ -110,11 +105,30 @@ struct PaywallView: View {
                 }
                 .onAppear {
                     Task {
-                        await purchasesManager.getOfferings() // Refresh offerings when view appears
+                        await purchasesManager.getOfferings()
+                        // Attempt to pre-select the weekly package after offerings are loaded
+                        if let offerings = purchasesManager.offerings, let premiumOffering = offerings.offering(identifier: "premium_offering") {
+                            // Attempt to find a weekly package. This logic might need adjustment based on your actual product IDs.
+                            let weeklyPackage = premiumOffering.availablePackages.first { pkg in
+                                let identifier = pkg.storeProduct.productIdentifier.lowercased()
+                                let title = pkg.storeProduct.localizedTitle.lowercased()
+                                return identifier.contains("weekly") || title.contains("weekly") || identifier.contains("week") || title.contains("week")
+                            }
+                            if let weeklyPackage = weeklyPackage {
+                                self.selectedPackage = weeklyPackage
+                                print("Defaulted to weekly package: \(weeklyPackage.storeProduct.localizedTitle)")
+                            } else if let firstPackage = premiumOffering.availablePackages.first {
+                                // Fallback to the first available package if no weekly is found
+                                self.selectedPackage = firstPackage
+                                print("Weekly package not found. Defaulted to first available package: \(firstPackage.storeProduct.localizedTitle)")
+                            }
+                        }
                     }
-                    // Reset countdown if view reappears
+                    // Reset countdown if view reappears and hasn't been dismissed yet
                     if !canDismiss {
-                        countdown = 5
+                        countdown = 5 // Ensure timer starts from 5 if view re-appears before 5s
+                        // Re-initialize timer if it was cancelled and view re-appears before canDismiss is true
+                        // This part is tricky with the current timer setup. Simpler to just let it run once.
                     }
                 }
 
@@ -216,8 +230,9 @@ struct FeatureGridView: View {
                     Text(feature.description)
                         .font(.caption)
                         .foregroundColor(Color.themeSecondaryText)
-                        .lineLimit(2, reservesSpace: true)
+                        .lineLimit(2, reservesSpace: true) // Good for reserving space
                 }
+                .frame(minHeight: 120, alignment: .topLeading) // Ensure consistent height
                 .padding(12)
                 .background(Color.themeSecondaryBackground)
                 .cornerRadius(10)

@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth // Added for AuthService
 
 // MARK: - Data Model for Onboarding Pages
 enum OnboardingPageType {
@@ -303,6 +304,10 @@ struct IdentificationCardPreview: View {
 struct CollectScreen: View {
     let page: OnboardingPage
     @Binding var isOnboardingComplete: Bool
+    
+    @State private var authError: String?
+    @State private var showAlert = false
+    @State private var isSigningIn = false // To show activity indicator
 
     // Animation states
     @State private var showText = false
@@ -340,14 +345,57 @@ struct CollectScreen: View {
 
             Spacer()
 
-            OnboardingButton(
-                title: page.startButtonText ?? "Start Exploring",
-                backgroundColor: page.startButtonBackgroundColor ?? .blue,
-                textColor: page.startButtonTextColor ?? .white
-            ) {
-                isOnboardingComplete = true
+            Group {
+                if isSigningIn {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: page.startButtonTextColor ?? ThemeColors.primaryText))
+                        .padding(.vertical, 15) // Match button padding
+                        .frame(maxWidth: .infinity)
+                        .background(page.startButtonBackgroundColor ?? ThemeColors.accent)
+                        .cornerRadius(12)
+                        .shadow(color: ThemeColors.primaryText.opacity(0.1), radius: 5, x: 0, y: 2)
+                } else {
+                    OnboardingButton(
+                        title: page.startButtonText ?? "Start Exploring",
+                        backgroundColor: page.startButtonBackgroundColor ?? ThemeColors.accent,
+                        textColor: page.startButtonTextColor ?? ThemeColors.primaryText
+                    ) {
+                        // Check if a user session already exists
+                        if AuthService.shared.user != nil {
+                            print("User already authenticated. Completing onboarding.")
+                            // The user is already logged in, so just complete the onboarding.
+                            // The check in ContentView's onAppear will handle Firestore document creation.
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                isOnboardingComplete = true
+                            }
+                        } else {
+                            // No user, proceed with anonymous sign-in
+                            isSigningIn = true
+                            AuthService.shared.signInAnonymously { success, error in
+                                isSigningIn = false
+                                if success {
+                                    print("Anonymous sign-in successful from Onboarding.")
+                                    // The signInAnonymously function now handles document creation.
+                                    withAnimation(.easeInOut(duration: 0.5)) {
+                                        isOnboardingComplete = true
+                                    }
+                                } else {
+                                    print("Anonymous sign-in failed: \(error?.localizedDescription ?? "Unknown error")")
+                                    self.authError = error?.localizedDescription ?? "An unknown error occurred during sign-in."
+                                    self.showAlert = true
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            .opacity(showCards.allSatisfy { $0 } ? 1 : 0) // Appear when cards are shown
+            .alert(isPresented: $showAlert) {
+                Alert(
+                    title: Text("Sign-In Failed"),
+                    message: Text(authError ?? "An unknown error occurred."),
+                    dismissButton: .default(Text("OK"))
+                )
+            }.opacity(showCards.allSatisfy { $0 } ? 1 : 0) // Appear when cards are shown
             .animation(.easeIn.delay(1.5), value: showCards.allSatisfy { $0 })
 
             Spacer().frame(height: 20)

@@ -1,5 +1,5 @@
 // functions/index.js
-const {onRequest} = require("firebase-functions/v2/https"); // Corrected import
+const {onRequest, onCall, HttpsError} = require("firebase-functions/v2/https"); // Corrected import
 const admin = require("firebase-admin");
 const logger = require("firebase-functions/logger");
 
@@ -54,7 +54,8 @@ exports.revenueCatWebhook = onRequest(
 
       // Authentication successful, now process the event
       try {
-      // (indent 4 spaces from here)
+        logger.info("Full RevenueCat Webhook req.body:", req.body); // Log the entire request body
+        // (indent 4 spaces from here)
         const body = req.body;
         const payload = body.event ? body.event : body;
         const eventType = payload.type;
@@ -66,6 +67,7 @@ exports.revenueCatWebhook = onRequest(
           eventId,
           eventType,
           appUserId,
+          originalAppUserId: payload.original_app_user_id, // Log the original_app_user_id
           productId,
           payloadTimestamp: payload.event_timestamp_ms,
         });
@@ -170,6 +172,7 @@ async function grantTokensToUser(firebaseUid, productId, eventType) {
     try {
       await userRef.set({
         tokens: admin.firestore.FieldValue.increment(tokensToGrant),
+        isPremium: true, // <-- Add this line
         subscriptionActive: true,
         subscriptionProductId: productId,
         lastSubscriptionEvent: eventType,
@@ -193,6 +196,7 @@ async function grantTokensToUser(firebaseUid, productId, eventType) {
     );
     try {
       await userRef.set({
+        isPremium: true, // <-- Add this line (for cases like TEST events or initial setup if needed)
         subscriptionActive: true,
         subscriptionProductId: productId,
         lastSubscriptionEvent: eventType,
@@ -228,6 +232,7 @@ async function removeTokensFromUser(firebaseUid, eventType) {
   try {
     await userRef.set({
       tokens: 0,
+      isPremium: false, // <-- Add this line
       subscriptionActive: false,
       lastSubscriptionEvent: eventType,
       lastCancellationAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -245,3 +250,89 @@ async function removeTokensFromUser(firebaseUid, eventType) {
     throw error;
   }
 }
+
+/**
+ * Consumes one token from a user if they are not a premium subscriber.
+ * This is a callable function, invoked from the client.
+ * @param {object} data The data passed to the function (not used).
+ * @param {object} context The context of the call, including auth information.
+ * @return {Promise<{success: boolean, tokensRemaining: number | string}>}
+ * A promise that resolves with the result of the token consumption.
+ */
+exports.consumeToken = onCall(async (data, context) => {
+  // 1. Check for authentication
+  if (!context.auth) {
+    // Throwing an HttpsError so that the client gets the error details.
+    throw new HttpsError(
+        "unauthenticated",
+        "The function must be called while authenticated.",
+    );
+  }
+
+  const firebaseUid = context.auth.uid;
+  const userRef = db.collection("users").doc(firebaseUid);
+  logger.info(`Token consumption request for user: ${firebaseUid}`);
+
+  try {
+    // Use a transaction to atomically read and update the token count.
+    return await db.runTransaction(async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists) {
+        throw new HttpsError(
+            "not-found",
+            "User document not found.",
+        );
+      }
+
+      const userData = userDoc.data();
+
+      // 2. Premium users have unlimited access, no token change.
+      if (userData.isPremium === true || userData.subscriptionActive === true) {
+        logger.info(
+            `User ${firebaseUid} is premium. Allowing action without cost.`,
+        );
+        return {success: true, tokensRemaining: "unlimited"};
+      }
+
+      // 3. Check if the user has enough tokens.
+      const currentTokens = userData.tokens || 0;
+      if (currentTokens <= 0) {
+        logger.warn(
+            `User ${firebaseUid} has no tokens. Denying action.`,
+        );
+        throw new HttpsError(
+            "failed-precondition",
+            "You are out of tokens. Please subscribe for more.",
+        );
+      }
+
+      // 4. Decrement the token count within the transaction.
+      transaction.update(userRef, {
+        tokens: admin.firestore.FieldValue.increment(-1),
+      });
+
+      const newTokens = currentTokens - 1;
+      logger.info(
+          `Successfully consumed token for ${firebaseUid}. ` +
+          `Remaining: ${newTokens}.`,
+      );
+
+      return {success: true, tokensRemaining: newTokens};
+    });
+  } catch (error) {
+    // Re-throw HttpsError to the client, log other errors for debugging.
+    if (error.code && error.http) { // Duck-typing for HttpsError
+      throw error;
+    }
+    logger.error(
+        `Error consuming token for user ${firebaseUid}:`,
+        error,
+    );
+    throw new HttpsError(
+        "internal",
+        "An internal error occurred while consuming token.",
+    );
+  }
+});
+
