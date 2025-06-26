@@ -186,16 +186,17 @@ struct InfoRow: View {
 
 struct ResultsView_Previews: PreviewProvider {
     static var previews: some View {
-        let sampleResult = BugIdentificationResult(
+                let sampleResult = BugIdentificationResult(
+            id: UUID(),
             name: "Ladybug",
             description: "Ladybugs are generally considered useful insects, as many species prey on aphids or scale insects, which are pests in gardens, agricultural fields, orchards, and similar places.",
-            habitat: "Fields, forests, gardens, and sometimes homes.",
-            isPoisonous: false,
             family: "Coccinellidae",
             scientificName: "Coccinella septempunctata",
             order: "Coleoptera",
+            habitat: "Fields, forests, gardens, and sometimes homes.",
             diet: "Aphids, scale insects, and other small pests.",
-            lifeCycle: "Complete metamorphosis: egg, larva, pupa, and adult."
+            lifeCycle: "Complete metamorphosis: egg, larva, pupa, and adult.",
+            isPoisonous: false
         )
         
         NavigationView {

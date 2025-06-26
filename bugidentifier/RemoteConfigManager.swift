@@ -1,60 +1,77 @@
 import Foundation
 import FirebaseRemoteConfig
-import Combine
 
-class RemoteConfigManager: ObservableObject {
-    static let shared = RemoteConfigManager()
+// Manages fetching configuration values from Firebase Remote Config.
+// This is a singleton to ensure a single, consistent source of configuration.
+public class RemoteConfigManager {
 
-    @Published var geminiAPIKey: String?
-
-    private var remoteConfig: RemoteConfig
-    private let geminiAPIKeyKey = "gemini_api_key"
+    public static let shared = RemoteConfigManager()
+    private let remoteConfig: RemoteConfig
+    
+    // Private struct to hold the keys for Remote Config.
+    // This prevents magic strings and improves maintainability.
+    private struct ConfigKeys {
+        static let revenueCatApiKey = "revenuecat_api_key"
+        static let geminiApiKey = "gemini_api_key"
+    }
 
     private init() {
-        self.remoteConfig = RemoteConfig.remoteConfig()
-        setupConfigSettings()
-        setupDefaults()
-        fetchAndActivate()
-    }
-
-    private func setupConfigSettings() {
+        remoteConfig = RemoteConfig.remoteConfig()
         let settings = RemoteConfigSettings()
-        // Lower fetch interval for development; increase for production
-        settings.minimumFetchInterval = 0 // Fetches every time in debug
-        self.remoteConfig.configSettings = settings
+        // Use a low fetch interval for debugging.
+        // For production, this should be set to a higher value.
+        settings.minimumFetchInterval = 0
+        remoteConfig.configSettings = settings
+        
+        // Set default values. This is good practice. An empty string is a safe default.
+        remoteConfig.setDefaults([
+            ConfigKeys.revenueCatApiKey: "" as NSObject,
+            ConfigKeys.geminiApiKey: "" as NSObject
+        ])
     }
 
-    private func setupDefaults() {
-        // Provide a default value. This is crucial for when the app
-        // is launched for the first time or has no network connection.
-        // The value here could be an empty string or a non-functional key.
-        let defaults: [String: NSObject] = [
-            geminiAPIKeyKey: "" as NSObject
-        ]
-        self.remoteConfig.setDefaults(defaults)
-    }
-
-    func fetchAndActivate() {
-        remoteConfig.fetchAndActivate { [weak self] (status, error) in
-            guard let self = self else { return }
-            
+    // A generic, private function to fetch any string value from Remote Config.
+    // This is the core logic that all public fetch methods will use.
+    private func fetchConfigValue(forKey key: String, completion: @escaping (String?) -> Void) {
+        remoteConfig.fetchAndActivate { (status, error) in
             if let error = error {
-                print("Error fetching Remote Config: \(error.localizedDescription)")
+                print("RemoteConfigManager: Error fetching and activating config: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
                 return
             }
-            
+
             switch status {
             case .successFetchedFromRemote, .successUsingPreFetchedData:
-                let fetchedKey = self.remoteConfig[self.geminiAPIKeyKey].stringValue ?? ""
+                let value = self.remoteConfig.configValue(forKey: key).stringValue
+                // Treat an empty string as a nil value, as an empty key is not useful.
+                let result = !value.isEmpty ? value : nil
+                print("RemoteConfigManager: Successfully fetched '\(key)'. Result is empty: \(result == nil)")
                 DispatchQueue.main.async {
-                    self.geminiAPIKey = fetchedKey
-                    print("Remote Config: Successfully fetched API key.")
+                    completion(result)
                 }
             case .error:
-                print("Remote Config: Error activating fetched configs.")
+                print("RemoteConfigManager: An error occurred while fetching config for key: \(key).")
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
             @unknown default:
-                print("Remote Config: Unknown status after fetch.")
+                print("RemoteConfigManager: An unknown status was returned for key: \(key).")
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
             }
         }
+    }
+    
+    // Public method for fetching the RevenueCat API Key.
+    public func fetchRevenueCatApiKey(completion: @escaping (String?) -> Void) {
+        fetchConfigValue(forKey: ConfigKeys.revenueCatApiKey, completion: completion)
+    }
+
+    // Public method for fetching the Gemini API Key.
+    public func fetchGeminiApiKey(completion: @escaping (String?) -> Void) {
+        fetchConfigValue(forKey: ConfigKeys.geminiApiKey, completion: completion)
     }
 }

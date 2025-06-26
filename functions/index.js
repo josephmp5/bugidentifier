@@ -108,10 +108,20 @@ exports.revenueCatWebhook = onRequest(
               "TEST event: Auth OK.",
           );
         } else if (eventType === "TRANSFER") {
-          logger.info(
-              `TRANSFER event received for user ${appUserId}. ` +
-            "Manual review might be needed or define specific logic.",
-          );
+          const originalAppUserId = payload.original_app_user_id;
+          if (originalAppUserId && originalAppUserId !== appUserId) {
+            await transferSubscription(
+                originalAppUserId,
+                appUserId,
+                eventType,
+            );
+          } else {
+            logger.warn(
+                "TRANSFER event received without a valid " +
+                `original_app_user_id. New UID: ${appUserId}, Original ` +
+                `UID: ${originalAppUserId || "not provided"}.`,
+            );
+          }
         } else {
           logger.info(
               `Unhandled event type: ${eventType} for user ${appUserId}. ` +
@@ -252,6 +262,69 @@ async function removeTokensFromUser(firebaseUid, eventType) {
 }
 
 /**
+ * Transfers subscription status from an old user ID to a new one.
+ * @param {string} fromUid The original Firebase UID.
+ * @param {string} toUid The new Firebase UID.
+ * @param {string} eventType The type of RevenueCat event ("TRANSFER").
+ * @return {Promise<void>} A promise that resolves when the transfer is complete.
+ */
+async function transferSubscription(fromUid, toUid, eventType) {
+  logger.info(`Transferring subscription from ${fromUid} to ${toUid}.`);
+  const fromUserRef = db.collection("users").doc(fromUid);
+  const toUserRef = db.collection("users").doc(toUid);
+
+  try {
+    // Use a transaction to ensure atomicity
+    await db.runTransaction(async (transaction) => {
+      const fromUserDoc = await transaction.get(fromUserRef);
+      const toUserDoc = await transaction.get(toUserRef);
+
+      if (!fromUserDoc.exists) {
+        logger.warn(
+            `Original user document ${fromUid} not found for transfer. ` +
+            "This is expected if the anonymous user had no Firestore doc. " +
+            "The new user's entitlements will be set by other events.",
+        );
+        return;
+      }
+
+      const fromUserData = fromUserDoc.data();
+      const fromTokens = fromUserData.tokens || 0;
+      const toTokens = (toUserDoc.exists && toUserDoc.data().tokens) ?
+        toUserDoc.data().tokens : 0;
+
+      // 1. Set/update subscription data on the new user document
+      transaction.set(toUserRef, {
+        isPremium: fromUserData.isPremium || false,
+        subscriptionActive: fromUserData.subscriptionActive || false,
+        subscriptionProductId: fromUserData.subscriptionProductId || null,
+        lastSubscriptionEvent: eventType,
+        lastGrantAt: admin.firestore.FieldValue.serverTimestamp(),
+        tokens: fromTokens + toTokens, // Combine tokens
+      }, {merge: true});
+
+      // 2. Invalidate the old user's subscription data
+      transaction.set(fromUserRef, {
+        tokens: 0,
+        isPremium: false,
+        subscriptionActive: false,
+        lastSubscriptionEvent: "TRANSFERRED_AWAY",
+        lastCancellationAt: admin.firestore.FieldValue.serverTimestamp(),
+        transferredTo: toUid, // Keep a record of the transfer
+      }, {merge: true});
+    });
+
+    logger.info(`Successfully transferred subscription from ${fromUid} to ${toUid}.`);
+  } catch (error) {
+    logger.error(
+        `Failed to transfer subscription from ${fromUid} to ${toUid}:`,
+        error,
+    );
+    throw error;
+  }
+}
+
+/**
  * Consumes one token from a user if they are not a premium subscriber.
  * This is a callable function, invoked from the client.
  * @param {object} data The data passed to the function (not used).
@@ -259,9 +332,9 @@ async function removeTokensFromUser(firebaseUid, eventType) {
  * @return {Promise<{success: boolean, tokensRemaining: number | string}>}
  * A promise that resolves with the result of the token consumption.
  */
-exports.consumeToken = onCall(async (data, context) => {
+exports.consumeToken = onCall(async (request) => {
   // 1. Check for authentication
-  if (!context.auth) {
+  if (!request.auth) {
     // Throwing an HttpsError so that the client gets the error details.
     throw new HttpsError(
         "unauthenticated",
@@ -269,7 +342,7 @@ exports.consumeToken = onCall(async (data, context) => {
     );
   }
 
-  const firebaseUid = context.auth.uid;
+  const firebaseUid = request.auth.uid;
   const userRef = db.collection("users").doc(firebaseUid);
   logger.info(`Token consumption request for user: ${firebaseUid}`);
 

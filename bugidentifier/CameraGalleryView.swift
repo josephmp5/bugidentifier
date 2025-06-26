@@ -90,7 +90,8 @@ struct CameraGalleryView: View {
             )
         }
         .sheet(isPresented: $showPaywall) {
-            PaywallView()
+            PaywallView(isModal: true)
+                .interactiveDismissDisabled()
         }
     }
 
@@ -110,63 +111,79 @@ struct CameraGalleryView: View {
     }
 
     private func performIdentification() {
+        // Show loading indicator immediately
+        isIdentifying = true
+
+        // Ensure we have image data to process
+        guard let image = inputImage, let imageData = image.jpegData(compressionQuality: 0.8) else {
+            errorMessage = "Could not process the selected image."
+            showErrorAlert = true
+            isIdentifying = false
+            return
+        }
+
+        // Ensure we have a user profile to check for access
         guard let user = userManager.user else {
-            print("User data not available yet. Cannot perform identification.")
             errorMessage = "Could not verify your user profile. Please check your connection and try again."
             showErrorAlert = true
+            isIdentifying = false
             return
         }
 
-        // If user is not premium and has no tokens, show paywall immediately.
+        // If user is not premium and has no tokens, show the paywall
         if !user.hasAccess {
             showPaywall = true
+            isIdentifying = false
             return
         }
 
-        // User has access (is premium or has tokens), so try to consume one.
+        // The user has access, so consume a token (or use their premium status)
         userManager.consumeToken { result in
+            // Since CameraGalleryView is a struct, 'weak self' is not needed and causes a compiler error.
+            // 'self' is captured by value automatically.
             switch result {
             case .success:
-                // Token consumed successfully (or user is premium), proceed with identification.
-                self.identifyImage()
+                // Token was consumed successfully, now call the Gemini API
+                GeminiAPIService.shared.identifyBug(imageData: imageData) { result in
+                    DispatchQueue.main.async {
+                        // Hide the loading indicator
+                        self.isIdentifying = false
+
+                        switch result {
+                        case .success(let identificationResult):
+                            // Set the result, which makes the NavigationLink available
+                            self.identificationResult = identificationResult
+                            HistoryManager.shared.add(imageData: imageData, bugName: identificationResult.name)
+                            
+                            // Delay navigation slightly to allow the view hierarchy to update
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                self.navigateToResults = true
+                            }
+                        case .failure(let error):
+                            // Show an error if identification fails
+                            self.errorMessage = error.localizedDescription
+                            self.showErrorAlert = true
+                        }
+                    }
+                }
             case .failure(let error):
-                if let nsError = error as NSError?,
-                   nsError.domain == "com.google.firebase.functions",
-                   nsError.code == Functions.FunctionsErrorCode.failedPrecondition.rawValue {
-                    // This specific error means the user is out of tokens.
-                    self.showPaywall = true
-                } else {
-                    // Handle other errors (e.g., network issues)
-                    self.errorMessage = "An error occurred: \(error.localizedDescription)"
-                    self.showErrorAlert = true
-                }
-            }
-        }
-    }
-
-    private func identifyImage() {
-        guard let image = inputImage else { return }
-
-        Task {
-            isIdentifying = true
-            do {
-                let result = try await GeminiAPIService.shared.identifyBug(from: image)
-
-                // Save to history on success
-                if let imageData = image.jpegData(compressionQuality: 0.8) {
-                    HistoryManager.shared.add(imageData: imageData, bugName: result.name)
-                }
-
-                // Set result and trigger navigation
+                // This handles failures from the consumeToken function
                 DispatchQueue.main.async {
-                    self.identificationResult = result
-                    self.navigateToResults = true
+                    self.isIdentifying = false
+                    let nsError = error as NSError
+                    if nsError.domain == FunctionsErrorDomain,
+                       let code = FunctionsErrorCode(rawValue: nsError.code),
+                       code == .failedPrecondition {
+                        // This is a specific error for "out of tokens"
+                        self.errorMessage = nsError.userInfo[FunctionsErrorDetailsKey] as? String ?? "You are out of tokens."
+                        self.showPaywall = true
+                    } else {
+                        // Handle other errors
+                        self.errorMessage = error.localizedDescription
+                        self.showErrorAlert = true
+                    }
                 }
-            } catch {
-                self.errorMessage = error.localizedDescription
-                self.showErrorAlert = true
             }
-            isIdentifying = false
         }
     }
 }

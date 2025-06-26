@@ -307,137 +307,74 @@ struct CollectScreen: View {
     
     @State private var authError: String?
     @State private var showAlert = false
-    @State private var isSigningIn = false // To show activity indicator
-
-    // Animation states
-    @State private var showText = false
-    @State private var showCards = [false, false, false]
+    @State private var isSigningIn = false
 
     var body: some View {
-        VStack(spacing: 30) {
+        VStack {
             Spacer()
-
-            // Animated Text
-            VStack(spacing: 15) {
+            
+            // Headline Text
+            VStack {
                 SerifText(page.headline3 ?? "", size: 28)
                 Text(page.body3 ?? "")
-                    .font(.system(.body, design: .default))
-                    .foregroundColor(ThemeColors.primaryText.opacity(0.8))
             }
-            .multilineTextAlignment(.center)
             .padding(.horizontal, 40)
-            .opacity(showText ? 1 : 0)
-
-            // Animated Card Stack
-            ZStack {
-                if let details = page.collageCardDetails, details.count == 3 {
-                    // Card 3 (Bottom)
-                    createCardView(details[2].imageName, rotation: 6, offset: 50, show: showCards[2])
-
-                    // Card 2 (Middle)
-                    createCardView(details[1].imageName, rotation: -3, offset: 0, show: showCards[1])
-
-                    // Card 1 (Top)
-                    createCardView(details[0].imageName, rotation: 2, offset: -50, show: showCards[0])
-                }
-            }
-            .frame(height: 350)
 
             Spacer()
 
-            Group {
+            // Conditional Button
+            VStack {
                 if isSigningIn {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: page.startButtonTextColor ?? ThemeColors.primaryText))
-                        .padding(.vertical, 15) // Match button padding
+                        .padding(.vertical, 15)
                         .frame(maxWidth: .infinity)
-                        .background(page.startButtonBackgroundColor ?? ThemeColors.accent)
+                        .background(Color.gray.opacity(0.2))
                         .cornerRadius(12)
-                        .shadow(color: ThemeColors.primaryText.opacity(0.1), radius: 5, x: 0, y: 2)
                 } else {
                     OnboardingButton(
                         title: page.startButtonText ?? "Start Exploring",
                         backgroundColor: page.startButtonBackgroundColor ?? ThemeColors.accent,
                         textColor: page.startButtonTextColor ?? ThemeColors.primaryText
                     ) {
-                        // Check if a user session already exists
-                        if AuthService.shared.user != nil {
-                            print("User already authenticated. Completing onboarding.")
-                            // The user is already logged in, so just complete the onboarding.
-                            // The check in ContentView's onAppear will handle Firestore document creation.
-                            withAnimation(.easeInOut(duration: 0.5)) {
-                                isOnboardingComplete = true
-                            }
-                        } else {
-                            // No user, proceed with anonymous sign-in
-                            isSigningIn = true
-                            AuthService.shared.signInAnonymously { success, error in
-                                isSigningIn = false
-                                if success {
-                                    print("Anonymous sign-in successful from Onboarding.")
-                                    // The signInAnonymously function now handles document creation.
-                                    withAnimation(.easeInOut(duration: 0.5)) {
-                                        isOnboardingComplete = true
-                                    }
-                                } else {
-                                    print("Anonymous sign-in failed: \(error?.localizedDescription ?? "Unknown error")")
-                                    self.authError = error?.localizedDescription ?? "An unknown error occurred during sign-in."
-                                    self.showAlert = true
-                                }
-                            }
-                        }
+                        handleSignIn()
                     }
                 }
             }
-            .alert(isPresented: $showAlert) {
-                Alert(
-                    title: Text("Sign-In Failed"),
-                    message: Text(authError ?? "An unknown error occurred."),
-                    dismissButton: .default(Text("OK"))
-                )
-            }.opacity(showCards.allSatisfy { $0 } ? 1 : 0) // Appear when cards are shown
-            .animation(.easeIn.delay(1.5), value: showCards.allSatisfy { $0 })
+            .padding()
 
             Spacer().frame(height: 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(ThemeColors.background.edgesIgnoringSafeArea(.all))
-        .onAppear(perform: startAnimation)
+        .alert(isPresented: $showAlert) {
+            Alert(
+                title: Text("Sign-In Failed"),
+                message: Text(authError ?? "An unknown error occurred."),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
-    private func createCardView(_ imageName: String, rotation: Double, offset: CGFloat, show: Bool) -> some View {
-        Image(imageName)
-            .resizable()
-            .scaledToFit()
-            .frame(width: 180)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-            .rotationEffect(.degrees(show ? rotation : rotation + 10))
-            .offset(y: show ? offset : offset + 500) // Animate from bottom
-            .opacity(show ? 1 : 0)
-    }
-
-    private func startAnimation() {
-        // Reset
-        showText = false
-        showCards = [false, false, false]
-
-        // Animate
-        withAnimation(.easeIn(duration: 0.8)) {
-            showText = true
-        }
-
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.5)) {
-            showCards[0] = true
-        }
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.7)) {
-            showCards[1] = true
-        }
-        withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.9)) {
-            showCards[2] = true
+    private func handleSignIn() {
+        isSigningIn = true
+        AuthService.shared.signInAnonymously { result in
+            isSigningIn = false
+            switch result {
+            case .success(let user):
+                print("Anonymous sign-in successful. User ID: \(user.uid)")
+                withAnimation {
+                    isOnboardingComplete = true
+                }
+            case .failure(let error):
+                print("Error signing in anonymously: \(error.localizedDescription)")
+                self.authError = error.localizedDescription
+                self.showAlert = true
+            }
         }
     }
 }
+
+
 
 // MARK: - Generic Onboarding Button
 struct OnboardingButton: View {

@@ -1,225 +1,149 @@
 import SwiftUI
+import GoogleGenerativeAI
 
-// MARK: - Bug Identification Result Model
-
-struct BugIdentificationResult: Decodable {
+// Defines the data structure for the bug identification result.
+// This struct is Decodable to be easily parsed from the JSON response.
+struct BugIdentificationResult: Decodable, Identifiable {
+    var id = UUID()
     let name: String
     let description: String
-    let habitat: String
-    let isPoisonous: Bool
     let family: String?
-    // Taxonomy
     let scientificName: String?
     let order: String?
-    // Biology & Behavior
+    let habitat: String?
     let diet: String?
     let lifeCycle: String?
+    let isPoisonous: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case name, description, family, scientificName, order, habitat, diet, lifeCycle, isPoisonous
+    }
 }
 
-// MARK: - Gemini API Service
-
-import Combine
-
-class GeminiAPIService: ObservableObject {
-    static let shared = GeminiAPIService()
+// Defines the errors that can occur during the API interaction.
+// Conforming to LocalizedError provides user-friendly descriptions.
+enum APIError: Error, LocalizedError {
+    case apiKeyMissing
+    case requestFailed(Error)
+    case noContent
+    case imageProcessingFailed
+    case decodingFailed
     
-    @Published private var apiKey: String?
-
-    private let modelName = "gemini-2.5-flash-preview-05-20"
-
-    private func getAPIKey(timeoutSeconds: TimeInterval = 10) async throws -> String {
-        if let key = self.apiKey, !key.isEmpty {
-            return key
+    var errorDescription: String? {
+        switch self {
+        case .apiKeyMissing:
+            return "The Gemini API key is missing. Please check Firebase Remote Config."
+        case .requestFailed(let error):
+            return "The API request to Gemini failed: \(error.localizedDescription)"
+        case .noContent:
+            return "The API response from Gemini contained no content."
+        case .imageProcessingFailed:
+            return "Failed to process the image data for Gemini."
+        case .decodingFailed:
+            return "Failed to decode the JSON response from Gemini."
         }
+    }
+}
 
-        // Wait for the apiKey publisher to emit a non-nil, non-empty value
-        return try await withCheckedThrowingContinuation { continuation in
-            var cancellableStore: AnyCancellable?
-            var timeoutTask: Task<Void, Never>?
+// This service class handles all interactions with the Google Gemini API.
+// It is a singleton to ensure a single point of interaction.
+class GeminiAPIService {
+    static let shared = GeminiAPIService()
+    private var apiKey: String? // A cache for the API key to improve performance.
 
-            timeoutTask = Task {
-                // Sleep for the timeout duration
-                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
-                // If the task hasn't been cancelled by then, the timeout has occurred
-                if !Task.isCancelled {
-                    cancellableStore?.cancel() // Cancel the Combine subscription
-                    continuation.resume(throwing: APIError.apiKeyFetchTimeout)
-                }
+    private init() {}
+
+    // Main public function to identify a bug from image data.
+    // It orchestrates fetching the API key and performing the identification.
+    func identifyBug(imageData: Data, completion: @escaping (Result<BugIdentificationResult, Error>) -> Void) {
+        fetchKeyIfNeeded { [weak self] result in
+            guard let self = self else { return }
+
+            switch result {
+            case .success(let key):
+                // Once the key is confirmed, perform the actual API call.
+                self.performIdentification(with: key, imageData: imageData, completion: completion)
+            case .failure(let error):
+                completion(.failure(error))
             }
-
-            cancellableStore = self.$apiKey
-                .compactMap { $0 } // Ensure key is not nil
-                .filter { !$0.isEmpty } // Ensure key is not empty
-                .first() // Take the first valid key emitted
-                .sink(receiveCompletion: { completionStatus in
-                    timeoutTask?.cancel() // Cancel the timeout task as we've received a completion
-                    if case .failure(let error) = completionStatus {
-                        // This might happen if the $apiKey publisher itself emits an error.
-                        continuation.resume(throwing: error)
-                    } else if self.apiKey == nil || self.apiKey?.isEmpty == true {
-                        // If sink completes without a valid key (e.g. publisher finishes before emitting one)
-                        // and timeout didn't fire first, throw timeout.
-                        // This path is less likely with .first() but good for robustness.
-                         if !(timeoutTask?.isCancelled ?? true) { // Check if timeout already fired
-                            continuation.resume(throwing: APIError.apiKeyFetchTimeout)
-                         }
-                    }
-                }, receiveValue: { key in
-                    timeoutTask?.cancel() // Key received, cancel timeout task
-                    continuation.resume(returning: key)
-                })
         }
     }
-    private var cancellables = Set<AnyCancellable>()
 
-    private var apiUrl: URL? {
-        guard let key = apiKey, !key.isEmpty else { return nil }
-        return URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(modelName):generateContent?key=\(key)")
-    }
-
-    private init() {
-        // Subscribe to changes from RemoteConfigManager
-        RemoteConfigManager.shared.$geminiAPIKey
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] fetchedKey in
-                self?.apiKey = fetchedKey
-                if let key = fetchedKey, !key.isEmpty {
-                    print("GeminiAPIService: Successfully received API key.")
-                } else {
-                    print("GeminiAPIService: Received nil or empty API key.")
-                }
-            }
-            .store(in: &cancellables)
-    }
-
-    func identifyBug(from image: UIImage) async throws -> BugIdentificationResult {
-        let currentApiKey = try await getAPIKey()
-        
-        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(modelName):generateContent?key=\(currentApiKey)") else {
-            // This should ideally not happen if the key is valid and modelName is correct.
-            throw APIError.invalidURL
+    // Performs the actual network request to the Gemini API.
+    private func performIdentification(with apiKey: String, imageData: Data, completion: @escaping (Result<BugIdentificationResult, Error>) -> Void) {
+        guard let image = UIImage(data: imageData) else {
+            completion(.failure(APIError.imageProcessingFailed))
+            return
         }
 
-        // 1. Convert UIImage to Base64
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            throw APIError.imageConversionFailed
-        }
-        let base64Image = imageData.base64EncodedString()
+        // Configure the model with safety settings to be less restrictive.
+        // This can prevent the API from blocking responses for benign content.
+        let safetySettings = [
+            SafetySetting(harmCategory: .harassment, threshold: .blockOnlyHigh),
+            SafetySetting(harmCategory: .hateSpeech, threshold: .blockOnlyHigh),
+            SafetySetting(harmCategory: .sexuallyExplicit, threshold: .blockOnlyHigh),
+            SafetySetting(harmCategory: .dangerousContent, threshold: .blockOnlyHigh),
+        ]
 
-        // 2. Construct the request body
+        let generativeModel = GenerativeModel(name: "gemini-2.5-flash-preview-05-20", apiKey: apiKey, safetySettings: safetySettings)
         let prompt = """
         Identify the insect in this image. Provide its common name, a brief description of its key features, its typical habitat, and whether it is poisonous to humans.
         Format the response as a single, clean JSON object with the following keys: 'name' (string), 'description' (string), 'family' (string), 'scientificName' (string), 'order' (string), 'habitat' (string), 'diet' (string), 'lifeCycle' (string), and 'isPoisonous' (boolean). All keys except for name, description, habitat, and isPoisonous are optional if the information is not available.
-        Do not include any other text or markdown formatting like ```json before or after the JSON object.
+        If the image does not contain an insect, the 'name' field should be 'Not an insect' and all other fields should be empty strings or false for the boolean.
         """
         
-        let requestBody = GeminiAPIRequest(
-            contents: [
-                GeminiAPIContent(parts: [
-                    GeminiAPIPart(text: prompt),
-                    GeminiAPIPart(inlineData: GeminiAPIInlineData(mimeType: "image/jpeg", data: base64Image))
-                ])
-            ]
-        )
+        Task {
+            do {
+                let response = try await generativeModel.generateContent(prompt, image)
+                if var text = response.text {
+                    // The model may wrap the JSON in markdown backticks. We need to strip them.
+                    text = text.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // 3. Create and send the URLRequest
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(requestBody)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw APIError.networkError(response: response, data: data)
-        }
-
-        // 4. Decode the response and the nested JSON
-        let geminiResponse = try JSONDecoder().decode(GeminiAPIResponse.self, from: data)
-        
-        guard let textPart = geminiResponse.candidates.first?.content.parts.first?.text else {
-            throw APIError.noContentReceived
-        }
-        
-        guard let responseData = textPart.data(using: .utf8) else {
-            throw APIError.decodingFailed
-        }
-        
-        let finalResult = try JSONDecoder().decode(BugIdentificationResult.self, from: responseData)
-        return finalResult
-    }
-}
-
-// MARK: - API Error Enum
-
-enum APIError: Error, LocalizedError {
-    case invalidURL
-    case apiKeyNotAvailable
-    case invalidAPIKey
-    case imageConversionFailed
-    case apiKeyFetchTimeout
-    case networkError(response: URLResponse?, data: Data?)
-    case decodingFailed
-    case noContentReceived
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL:
-            return "The API URL is invalid."
-        case .apiKeyNotAvailable:
-            return "API key is not available. It might still be loading or failed to fetch from Remote Config."
-        case .invalidAPIKey:
-            return "The fetched API key is invalid or empty. Please check your Firebase Remote Config setup."
-        case .imageConversionFailed:
-            return "Failed to convert the image to a suitable format."
-        case .networkError(let response, let data):
-            if let httpResponse = response as? HTTPURLResponse {
-                var details = "Network request failed with status code \(httpResponse.statusCode)."
-                if let data = data, let errorBody = String(data: data, encoding: .utf8) {
-                    details += "\nResponse: \(errorBody)"
+                    // Attempt to decode the cleaned JSON text from the response.
+                    do {
+                        let result = try JSONDecoder().decode(BugIdentificationResult.self, from: Data(text.utf8))
+                        DispatchQueue.main.async {
+                            completion(.success(result))
+                        }
+                    } catch {
+                        print("GeminiAPIService: JSON Decoding Error: \(error.localizedDescription)")
+                        print("GeminiAPIService: Raw text from Gemini that failed to decode: \(text)")
+                        DispatchQueue.main.async {
+                            completion(.failure(APIError.decodingFailed))
+                        }
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        completion(.failure(APIError.noContent))
+                    }
                 }
-                return details
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(APIError.requestFailed(error)))
+                }
             }
-            return "An unknown network error occurred."
-        case .decodingFailed:
-            return "Failed to decode the response from the API."
-        case .apiKeyFetchTimeout:
-            return "Could not fetch the API key in time. Please check your internet connection and try again."
-        case .noContentReceived:
-            return "The API response did not contain any usable content."
         }
     }
-}
 
-// MARK: - Gemini API Request/Response Structs
+    // Fetches the API key from RemoteConfigManager and caches it.
+    // If the key is already cached, it returns immediately.
+    private func fetchKeyIfNeeded(completion: @escaping (Result<String, Error>) -> Void) {
+        // If we already have a valid key, use it.
+        if let apiKey = self.apiKey, !apiKey.isEmpty {
+            completion(.success(apiKey))
+            return
+        }
 
-private struct GeminiAPIRequest: Encodable {
-    let contents: [GeminiAPIContent]
-}
-
-private struct GeminiAPIContent: Encodable, Decodable {
-    let parts: [GeminiAPIPart]
-}
-
-private struct GeminiAPIPart: Encodable, Decodable {
-    var text: String? = nil
-    var inlineData: GeminiAPIInlineData? = nil
-}
-
-private struct GeminiAPIInlineData: Encodable, Decodable {
-    let mimeType: String
-    let data: String
-    
-    enum CodingKeys: String, CodingKey {
-        case mimeType = "mime_type"
-        case data
+        // Otherwise, fetch it from our robust Remote Config service.
+        RemoteConfigManager.shared.fetchGeminiApiKey { [weak self] fetchedKey in
+            guard let self = self else { return }
+            
+            if let key = fetchedKey, !key.isEmpty {
+                self.apiKey = key // Cache the key for next time.
+                completion(.success(key))
+            } else {
+                completion(.failure(APIError.apiKeyMissing))
+            }
+        }
     }
-}
-
-private struct GeminiAPIResponse: Decodable {
-    let candidates: [GeminiAPICandidate]
-}
-
-private struct GeminiAPICandidate: Decodable {
-    let content: GeminiAPIContent
 }

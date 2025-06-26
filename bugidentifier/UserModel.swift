@@ -1,5 +1,5 @@
 import Foundation
-import FirebaseFirestoreSwift
+import FirebaseFirestore
 
 struct UserModel: Codable, Identifiable {
     // By using the @DocumentID property wrapper, Firestore will automatically

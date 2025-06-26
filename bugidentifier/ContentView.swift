@@ -17,20 +17,20 @@ struct ContentView: View {
         if isOnboardingComplete {
             MainTabView()
                 .onAppear {
-                    // Check for and create a user document in Firestore if it doesn't exist.
-                    authService.checkAndCreateUserDocumentIfNeeded()
-
-                    // Check if user is signed in (should be anonymous at this point)
-                    // and if the initial paywall hasn't been shown yet.
+                    // When the main view appears, check if the user is authenticated.
+                    // If they are, and we haven't shown them the paywall yet, present it.
                     if authService.user != nil && !hasPresentedInitialPaywall {
                         showPaywall = true
-                        hasPresentedInitialPaywall = true // Mark as presented
+                        hasPresentedInitialPaywall = true // Ensure it only shows once per install.
                     }
                 }
                 .sheet(isPresented: $showPaywall) {
-                    PaywallView() // Assuming PaywallView handles its own dismissal or environment
+                    // The paywall is presented modally and cannot be dismissed by swiping.
+                    PaywallView(isModal: true)
+                        .interactiveDismissDisabled()
                 }
         } else {
+            // If onboarding is not complete, show the OnboardingView.
             OnboardingView(isOnboardingComplete: $isOnboardingComplete)
         }
     }

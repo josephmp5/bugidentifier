@@ -1,5 +1,5 @@
 {
-  "originHash" : "01c573054542e7b79439b38868ab18673f3a75e00303d50529614e05521053e5",
+  "originHash" : "1804d2eac1f1d3410502a6b2d999dcaff2968b14c05954f833efe5f45db5d7c4",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -29,12 +29,21 @@
       }
     },
     {
+      "identity" : "generative-ai-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/generative-ai-swift",
+      "state" : {
+        "revision" : "44b8ce120425f9cf53ca756f3434ca2c2696f8bd",
+        "version" : "0.5.6"
+      }
+    },
+    {
       "identity" : "google-ads-on-device-conversion-ios-sdk",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/googleads/google-ads-on-device-conversion-ios-sdk",
       "state" : {
-        "revision" : "70a7857886f065a40486a7607268781c49db04ae",
-        "version" : "2.0.0"
+        "revision" : "428d8bb138e00f9a3f4f61cc6cd8863607524f65",
+        "version" : "2.1.0"
       }
     },
     {

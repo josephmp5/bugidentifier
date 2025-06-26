@@ -28,7 +28,7 @@ struct MainTabView: View {
                 }
             }
             .fullScreenCover(isPresented: $showPaywall) {
-                PaywallView()
+                PaywallView(isModal: false)
             }
         }
         .accentColor(.appThemePrimary)
