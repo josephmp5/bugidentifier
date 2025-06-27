@@ -1,16 +1,9 @@
 import SwiftUI
 
-import SwiftUI
-
-// Re-using SerifText or defining a similar one if preferred for local context
-// For consistency, ensure this matches the one in ResultsView or move to a shared location.
-// For this example, I'll assume SerifText is accessible or redefine a similar local one if needed.
-// Let's assume SerifText from Color+Theme.swift or ResultsView.swift is available.
-
 struct HistoryView: View {
     @StateObject private var historyManager = HistoryManager.shared
+    @State private var showingClearAlert = false
 
-    // Define the grid layout: 2 columns, flexible spacing
     private let columns: [GridItem] = [
         GridItem(.flexible(), spacing: 16),
         GridItem(.flexible(), spacing: 16)
@@ -21,53 +14,49 @@ struct HistoryView: View {
             ScrollView {
                 if historyManager.history.isEmpty {
                     emptyStateView
-                        .padding(.top, 50) // Give some space from the nav bar
+                        .padding(.top, 50)
                 } else {
                     historyGridView
                 }
             }
             .background(ThemeColors.background.edgesIgnoringSafeArea(.all))
             .navigationTitle("My Collection")
-            .navigationBarTitleDisplayMode(.inline) // Or .large for a different feel
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     if !historyManager.history.isEmpty {
                         Button {
-                            // Action for Sort
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down.circle")
-                                .foregroundColor(ThemeColors.primaryText)
-                        }
-
-                        Button {
-                            // Action for Filter
-                        } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                .foregroundColor(ThemeColors.primaryText)
-                        }
-                        Button {
-                            historyManager.clearHistory()
+                            showingClearAlert = true
                         } label: {
                             Image(systemName: "trash")
-                                .foregroundColor(ThemeColors.accent) // Use accent for destructive potentially
+                                .foregroundColor(ThemeColors.accent)
                         }
                     }
                 }
             }
+            .alert(isPresented: $showingClearAlert) {
+                Alert(
+                    title: Text("Clear History"),
+                    message: Text("Are you sure you want to delete all identification history? This action cannot be undone."),
+                    primaryButton: .destructive(Text("Clear")) {
+                        historyManager.clearHistory()
+                    },
+                    secondaryButton: .cancel()
+                )
+            }
             .onAppear {
-                 // Set navigation bar appearance for this view
                 let appearance = UINavigationBarAppearance()
                 appearance.configureWithOpaqueBackground()
-                appearance.backgroundColor = UIColor(ThemeColors.background) // Off-white background
-                appearance.titleTextAttributes = [.foregroundColor: UIColor(ThemeColors.primaryText)] // Deep green title
+                appearance.backgroundColor = UIColor(ThemeColors.background)
+                appearance.titleTextAttributes = [.foregroundColor: UIColor(ThemeColors.primaryText)]
                 appearance.largeTitleTextAttributes = [.foregroundColor: UIColor(ThemeColors.primaryText)]
 
                 UINavigationBar.appearance().standardAppearance = appearance
                 UINavigationBar.appearance().scrollEdgeAppearance = appearance
-                UINavigationBar.appearance().compactAppearance = appearance // For inline
+                UINavigationBar.appearance().compactAppearance = appearance
             }
         }
-        .accentColor(ThemeColors.primaryText) // Sets default tint for controls like back button
+        .accentColor(ThemeColors.primaryText)
     }
 
     private var historyGridView: some View {
@@ -77,7 +66,7 @@ struct HistoryView: View {
                     item.image
                         .resizable()
                         .scaledToFill()
-                        .frame(width: (UIScreen.main.bounds.width / 2) - 32, height: (UIScreen.main.bounds.width / 2) - 32) // Maintain aspect ratio for circle
+                        .frame(width: (UIScreen.main.bounds.width / 2) - 32, height: (UIScreen.main.bounds.width / 2) - 32)
                         .clipShape(Circle())
                         .overlay(Circle().stroke(ThemeColors.primaryText.opacity(0.2), lineWidth: 1))
                         .shadow(color: ThemeColors.primaryText.opacity(0.1), radius: 3, y: 2)
@@ -86,18 +75,31 @@ struct HistoryView: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                     
-//                    Text(item.identificationDate, style: .date)
-//                        .font(.caption)
-//                        .foregroundColor(ThemeColors.primaryText.opacity(0.7))
+                    Text(item.identificationDate, style: .date)
+                        .font(.caption)
+                        .foregroundColor(ThemeColors.primaryText.opacity(0.7))
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        delete(item: item)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 }
             }
         }
         .padding()
     }
 
+    private func delete(item: IdentificationHistory) {
+        if let index = historyManager.history.firstIndex(where: { $0.id == item.id }) {
+            historyManager.history.remove(at: index)
+        }
+    }
+
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            Image(systemName: "leaf.fill") // Thematic icon
+            Image(systemName: "leaf.fill")
                 .font(.system(size: 60))
                 .foregroundColor(ThemeColors.accent)
             SerifText("Your Collection is Empty", size: 22, color: ThemeColors.primaryText)

@@ -129,6 +129,11 @@ struct ResultsView: View {
             }
         }
         .onAppear {
+            // Save the identification to history
+            if let image = imageUrl, let imageData = image.jpegData(compressionQuality: 0.8) {
+                HistoryManager.shared.add(imageData: imageData, bugName: result.name)
+            }
+
             // Make navigation bar transparent
             let appearance = UINavigationBarAppearance()
             appearance.configureWithTransparentBackground()

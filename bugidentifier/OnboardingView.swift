@@ -1,5 +1,5 @@
 import SwiftUI
-import FirebaseAuth // Added for AuthService
+import FirebaseAuth
 
 // MARK: - Data Model for Onboarding Pages
 enum OnboardingPageType {
@@ -11,25 +11,22 @@ struct OnboardingPage: Identifiable {
     let type: OnboardingPageType
     
     // Page 1: Welcome
-    var backgroundImageName: String? // For full-screen image
-    var headline1: String? 
+    var backgroundImageName: String?
+    var headline1: String?
     var subheadline1: String?
 
     // Page 2: Snap, Identify, Discover
     var headline2: String?
-    var phoneGraphicImageName: String? // Stylized phone
-    var lineArtBugImageName: String?   // Line art bug
-    var idCardImageName: String?       // Real photo for ID card
+    var lineArtBugImageName: String?
+    var idCardImageName: String?
     var idCardBugName: String?
-    // Minimalist data points for ID card can be an array of (String, String) for label and value
     var idCardData: [(label: String, value: String)]?
-    var continueButtonText: String? 
+    var continueButtonText: String?
 
     // Page 3: Build Your Collection
     var headline3: String?
     var body3: String?
-    // For collage - can be an array of simplified card data (image name, bug name)
-    var collageCardDetails: [(imageName: String, bugName: String)]?
+    var cardImageNames: [String]?
     var startButtonText: String?
     var startButtonBackgroundColor: Color?
     var startButtonTextColor: Color?
@@ -40,48 +37,35 @@ struct OnboardingView: View {
     @Binding var isOnboardingComplete: Bool
     @State private var currentPage = 0
 
-    // Define pages based on the new model and prompts
     let pages: [OnboardingPage] = [
-        // Page 1: Welcome to the Field
         OnboardingPage(
             type: .welcome,
             backgroundImageName: "onboarding_background_bee",
             headline1: "Your Digital Field Guide.",
             subheadline1: "Instantly identify insects and explore the wonders of the natural world."
         ),
-        // Page 2: Snap, Identify, Discover
         OnboardingPage(
             type: .identify,
             headline2: "Point, Snap, and Identify.",
-            phoneGraphicImageName: "onboarding_graphic_phone",
             lineArtBugImageName: "onboarding_graphic_dragonfly_lineart",
             idCardImageName: "onboarding_photo_dragonfly",
             idCardBugName: "Blue Dasher",
-            idCardData: [
-                ("Family", "Libellulidae"), 
-                ("Habitat", "Ponds, Marshes")
-            ],
+            idCardData: [("Family", "Libellulidae"), ("Habitat", "Ponds, Marshes")],
             continueButtonText: "Continue"
         ),
-        // Page 3: Build Your Collection
         OnboardingPage(
             type: .collect,
             headline3: "Curate Your Personal Collection.",
             body3: "Every insect you identify is saved to your personal, browsable journal.",
-            collageCardDetails: [
-                ("onboarding_card_ladybug", "Ladybug"), 
-                ("onboarding_card_beetle", "Stag Beetle"), 
-                ("onboarding_card_moth", "Luna Moth")
-            ],
+            cardImageNames: ["onboarding_card_moth", "onboarding_card_ladybug", "onboarding_card_beetle"],
             startButtonText: "Start Exploring",
-            startButtonBackgroundColor: ThemeColors.accent, // Warm Tan (#D4B79E)
-            startButtonTextColor: ThemeColors.primaryText // Deep Forest Green (#2C3D34)
+            startButtonBackgroundColor: ThemeColors.accent,
+            startButtonTextColor: ThemeColors.primaryText
         )
     ]
 
     var body: some View {
         ZStack {
-            // The TabView now acts as the base layer and can fill the whole screen
             TabView(selection: $currentPage) {
                 ForEach(pages.indices, id: \.self) { index in
                     OnboardingScreenView(page: pages[index], currentPage: $currentPage, isOnboardingComplete: $isOnboardingComplete)
@@ -89,9 +73,8 @@ struct OnboardingView: View {
                 }
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-            .edgesIgnoringSafeArea(.all) // Allow TabView content to go edge-to-edge
+            .edgesIgnoringSafeArea(.all)
 
-            // Overlay the progress indicator at the bottom
             VStack {
                 Spacer()
                 CustomProgressIndicator(numberOfPages: pages.count, currentPage: currentPage)
@@ -101,27 +84,25 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Individual Onboarding Screen View
+// MARK: - Individual Onboarding Screen Router
 struct OnboardingScreenView: View {
     let page: OnboardingPage
     @Binding var currentPage: Int
     @Binding var isOnboardingComplete: Bool
 
     var body: some View {
-        Group {
-            switch page.type {
-            case .welcome:
-                WelcomeScreen(page: page)
-            case .identify:
-                IdentifyScreen(page: page, currentPage: $currentPage)
-            case .collect:
-                CollectScreen(page: page, isOnboardingComplete: $isOnboardingComplete)
-            }
+        switch page.type {
+        case .welcome:
+            WelcomeScreen(page: page)
+        case .identify:
+            IdentifyScreen(page: page, currentPage: $currentPage)
+        case .collect:
+            CollectScreen(page: page, isOnboardingComplete: $isOnboardingComplete)
         }
     }
 }
 
-// MARK: - Screen 1: Welcome to the Field (Redesigned)
+// MARK: - Screen 1: Welcome
 struct WelcomeScreen: View {
     let page: OnboardingPage
     @State private var showContent = false
@@ -129,229 +110,116 @@ struct WelcomeScreen: View {
     var body: some View {
         VStack(spacing: 30) {
             Spacer()
-
-            // Central Image
             if let imageName = page.backgroundImageName {
                 Image(imageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 200, height: 200) // Adjust size as needed
-                    .clipShape(Circle()) // Example styling
-                    .shadow(color: ThemeColors.primaryText.opacity(0.2), radius: 10, x: 0, y: 5)
-                    .opacity(showContent ? 1 : 0)
-                    .animation(.easeIn(duration: 0.8).delay(0.2), value: showContent)
+                    .resizable().scaledToFit().frame(width: 200, height: 200)
+                    .clipShape(Circle()).shadow(color: ThemeColors.primaryText.opacity(0.2), radius: 10, y: 5)
+                    .opacity(showContent ? 1 : 0).animation(.easeIn(duration: 0.8).delay(0.2), value: showContent)
             }
-
-            // Text Content
             VStack(spacing: 15) {
                 SerifText(page.headline1 ?? "", size: 32, color: ThemeColors.primaryText)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.75)
-                
+                    .multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.75)
                 Text(page.subheadline1 ?? "")
-                    .font(.system(size: 17, weight: .regular, design: .default))
-                    .foregroundColor(ThemeColors.primaryText.opacity(0.7))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(3)
-                    .minimumScaleFactor(0.75)
+                    .font(.system(size: 17)).foregroundColor(ThemeColors.primaryText.opacity(0.7))
+                    .multilineTextAlignment(.center).lineLimit(3).minimumScaleFactor(0.75)
             }
-            .padding(.horizontal, 40)
-            .opacity(showContent ? 1 : 0)
-            .animation(.easeIn(duration: 0.8).delay(0.4), value: showContent)
-            
+            .padding(.horizontal, 40).opacity(showContent ? 1 : 0).animation(.easeIn(duration: 0.8).delay(0.4), value: showContent)
             Spacer()
-            Spacer() // Add more space at the bottom if needed, or adjust main Spacer()
+            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ThemeColors.background.edgesIgnoringSafeArea(.all))
-        .onAppear {
-            showContent = false // Reset for re-entry if view is reused
-            withAnimation {
-                showContent = true
-            }
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity).background(ThemeColors.background.edgesIgnoringSafeArea(.all))
+        .onAppear { showContent = false; withAnimation { showContent = true } }
     }
 }
 
-// MARK: - Screen 2: Snap, Identify, Discover (Redesigned)
+// MARK: - Screen 2: Identify
 struct IdentifyScreen: View {
     let page: OnboardingPage
     @Binding var currentPage: Int
-
-    // Animation states
     @State private var showHeadline = false
     @State private var showLineArt = false
-    @State private var scanLinePosition: CGFloat = -180
     @State private var showIdCard = false
+    @State private var scanLinePosition: CGFloat = -180
 
     var body: some View {
         VStack(spacing: 40) {
             Spacer()
-
-            Text(page.headline2 ?? "")
-                .font(.custom("Georgia-Bold", size: 28))
-                .foregroundColor(ThemeColors.primaryText)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-                .opacity(showHeadline ? 1 : 0)
-
-            // Animation Zone
+            Text(page.headline2 ?? "").font(.custom("Georgia-Bold", size: 28)).foregroundColor(ThemeColors.primaryText)
+                .multilineTextAlignment(.center).padding(.horizontal).opacity(showHeadline ? 1 : 0)
             ZStack {
-                // 1. The final ID card, initially hidden
-                IdentificationCardPreview(page: page)
-                    .opacity(showIdCard ? 1 : 0)
-
-                // 2. The line art, which gets replaced by the ID card
-                Image(page.lineArtBugImageName ?? "onboarding_graphic_dragonfly_lineart")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 150, height: 150)
-                    .foregroundColor(ThemeColors.primaryText.opacity(0.6))
-                    .opacity(showLineArt && !showIdCard ? 1 : 0)
-
-                // 3. The animated scan line
+                IdentificationCardPreview(page: page).opacity(showIdCard ? 1 : 0)
+                Image(page.lineArtBugImageName ?? "").resizable().scaledToFit().frame(width: 150, height: 150)
+                    .foregroundColor(ThemeColors.primaryText.opacity(0.6)).opacity(showLineArt && !showIdCard ? 1 : 0)
                 if !showIdCard {
-                    Capsule()
-                        .fill(LinearGradient(gradient: Gradient(colors: [ThemeColors.accent.opacity(0), ThemeColors.accent, ThemeColors.accent.opacity(0)]), startPoint: .top, endPoint: .bottom))
-                        .frame(width: 200, height: 5)
-                        .shadow(color: ThemeColors.accent, radius: 10, y: 0)
-                        .offset(y: scanLinePosition)
+                    Capsule().fill(LinearGradient(colors: [.clear, ThemeColors.accent, .clear], startPoint: .top, endPoint: .bottom))
+                        .frame(width: 200, height: 5).shadow(color: ThemeColors.accent, radius: 10, y: 0).offset(y: scanLinePosition)
                 }
-            }
-            .frame(height: 280) // Give the ZStack a fixed height
-
+            }.frame(height: 280)
             Spacer()
-
-            OnboardingButton(
-                title: page.continueButtonText ?? "Continue",
-                backgroundColor: ThemeColors.primaryText,
-                textColor: ThemeColors.background
-            ) {
-                withAnimation {
-                    if currentPage < 2 { currentPage += 1 }
-                }
-            }
-            .opacity(showIdCard ? 1 : 0) // Button appears after animation
-
-            Spacer().frame(height: 20)
+            OnboardingButton(title: page.continueButtonText ?? "Continue", backgroundColor: ThemeColors.primaryText, textColor: ThemeColors.background) {
+                withAnimation { if currentPage < 2 { currentPage += 1 } }
+            }.opacity(showIdCard ? 1 : 0)
+            Spacer().frame(height: 40)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ThemeColors.background.edgesIgnoringSafeArea(.all))
+        .frame(maxWidth: .infinity, maxHeight: .infinity).background(ThemeColors.background.edgesIgnoringSafeArea(.all))
         .onAppear(perform: startAnimation)
     }
 
     private func startAnimation() {
-        // Reset state for re-entry
         showHeadline = false
         showLineArt = false
         scanLinePosition = -180
         showIdCard = false
-
-        // Animation sequence
-        withAnimation(.easeIn(duration: 0.5)) {
-            showHeadline = true
-        }
-
-        withAnimation(.easeIn(duration: 0.5).delay(0.5)) {
-            showLineArt = true
-        }
-
-        withAnimation(.easeInOut(duration: 1.0).delay(1.2)) {
-            scanLinePosition = 180
-        }
-
-        withAnimation(.easeIn(duration: 0.5).delay(2.0)) {
-            showIdCard = true
-        }
+        withAnimation(.easeIn(duration: 0.5)) { showHeadline = true }
+        withAnimation(.easeIn(duration: 0.5).delay(0.5)) { showLineArt = true }
+        withAnimation(.easeInOut(duration: 1.0).delay(1.2)) { scanLinePosition = 180 }
+        withAnimation(.easeIn(duration: 0.5).delay(2.0)) { showIdCard = true }
     }
 }
 
-// Helper for ID Card Preview on Page 2
-struct IdentificationCardPreview: View {
-    let page: OnboardingPage
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(page.idCardImageName ?? "photo") // Placeholder for real bug photo
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(height: 120)
-                .clipped()
-                .cornerRadius(8)
-            
-            SerifText(page.idCardBugName ?? "Bug Name", size: 20, color: ThemeColors.primaryText)
-            
-            ForEach(page.idCardData ?? [], id: \.label) { dataPoint in
-                HStack {
-                    Text(dataPoint.label + ":")
-                        .font(.system(size: 12, weight: .semibold, design: .default))
-                        .foregroundColor(ThemeColors.primaryText.opacity(0.8))
-                    Text(dataPoint.value)
-                        .font(.system(size: 12, design: .default))
-                        .foregroundColor(ThemeColors.primaryText.opacity(0.7))
-                }
-            }
-        }
-        .padding(12)
-        .background(Color.white)
-        .cornerRadius(10)
-        .shadow(color: ThemeColors.primaryText.opacity(0.1), radius: 5, x: 0, y: 2)
-        .frame(width: 170) // Fixed width for the card preview
-    }
-}
-
-// MARK: - Screen 3: Build Your Collection (Redesigned)
+// MARK: - Screen 3: Collect
 struct CollectScreen: View {
     let page: OnboardingPage
     @Binding var isOnboardingComplete: Bool
-    
-    @State private var authError: String?
-    @State private var showAlert = false
+    @State private var showContent = false
+    @State private var showCards = false
     @State private var isSigningIn = false
+    @State private var showAlert = false
+    @State private var authError: String?
 
     var body: some View {
-        VStack {
+        VStack(spacing: 20) {
             Spacer()
+            VStack(spacing: 15) {
+                SerifText(page.headline3 ?? "", size: 28, color: ThemeColors.primaryText).multilineTextAlignment(.center)
+                Text(page.body3 ?? "").font(.system(size: 17)).foregroundColor(ThemeColors.primaryText.opacity(0.7)).multilineTextAlignment(.center)
+            }.padding(.horizontal, 40)
+
+            if let cardNames = page.cardImageNames {
+                CardDeckView(cardImageNames: cardNames, showCards: $showCards)
+            }
             
-            // Headline Text
-            VStack {
-                SerifText(page.headline3 ?? "", size: 28)
-                Text(page.body3 ?? "")
-            }
-            .padding(.horizontal, 40)
-
             Spacer()
 
-            // Conditional Button
-            VStack {
-                if isSigningIn {
-                    ProgressView()
-                        .padding(.vertical, 15)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(12)
-                } else {
-                    OnboardingButton(
-                        title: page.startButtonText ?? "Start Exploring",
-                        backgroundColor: page.startButtonBackgroundColor ?? ThemeColors.accent,
-                        textColor: page.startButtonTextColor ?? ThemeColors.primaryText
-                    ) {
-                        handleSignIn()
-                    }
-                }
+            if isSigningIn {
+                ProgressView()
+            } else {
+                OnboardingButton(title: page.startButtonText ?? "Start Exploring", backgroundColor: page.startButtonBackgroundColor ?? .blue, textColor: page.startButtonTextColor ?? .white, action: handleSignIn)
             }
-            .padding()
-
-            Spacer().frame(height: 20)
+            
+            Spacer().frame(height: 80) // This provides the necessary space for the progress indicator below
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ThemeColors.background.edgesIgnoringSafeArea(.all))
-        .alert(isPresented: $showAlert) {
-            Alert(
-                title: Text("Sign-In Failed"),
-                message: Text(authError ?? "An unknown error occurred."),
-                dismissButton: .default(Text("OK"))
-            )
+        .frame(maxWidth: .infinity, maxHeight: .infinity).background(ThemeColors.background.edgesIgnoringSafeArea(.all))
+        .onAppear {
+            showContent = false
+            showCards = false
+            withAnimation(.easeIn(duration: 0.5)) { showContent = true }
+            withAnimation { showCards = true }
+        }
+        .alert("Sign-In Failed", isPresented: $showAlert, presenting: authError) { _ in
+            Button("OK") {}
+        } message: { error in
+            Text(error)
         }
     }
 
@@ -359,65 +227,84 @@ struct CollectScreen: View {
         isSigningIn = true
         AuthService.shared.signInAnonymously { result in
             isSigningIn = false
-            switch result {
-            case .success(let user):
-                print("Anonymous sign-in successful. User ID: \(user.uid)")
-                withAnimation {
-                    isOnboardingComplete = true
-                }
-            case .failure(let error):
-                print("Error signing in anonymously: \(error.localizedDescription)")
+            if case .failure(let error) = result {
                 self.authError = error.localizedDescription
                 self.showAlert = true
+            } else {
+                isOnboardingComplete = true
             }
         }
     }
 }
 
+// MARK: - Helper Views
+struct CardDeckView: View {
+    let cardImageNames: [String]
+    @Binding var showCards: Bool
 
+    var body: some View {
+        ZStack {
+            ForEach(Array(zip(cardImageNames.indices, cardImageNames)), id: \.0) { index, imageName in
+                Image(imageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 250)
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    .rotationEffect(.degrees((Double(index) - 1.0) * 15.0))
+                    .offset(x: CGFloat(index - 1) * 50, y: 0)
+                    .opacity(showCards ? 1 : 0)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0).delay(0.1 * Double(index)), value: showCards)
+            }
+        }
+        .frame(height: 300)
+    }
+}
 
-// MARK: - Generic Onboarding Button
+struct IdentificationCardPreview: View {
+    let page: OnboardingPage
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(page.idCardImageName ?? "").resizable().aspectRatio(contentMode: .fill)
+                .frame(height: 120).clipped().cornerRadius(8)
+            SerifText(page.idCardBugName ?? "", size: 20, color: ThemeColors.primaryText)
+            ForEach(page.idCardData ?? [], id: \.label) { dataPoint in
+                HStack {
+                    Text(dataPoint.label + ":").font(.system(size: 12, weight: .semibold)).foregroundColor(ThemeColors.primaryText.opacity(0.8))
+                    Text(dataPoint.value).font(.system(size: 12)).foregroundColor(ThemeColors.primaryText.opacity(0.7))
+                }
+            }
+        }
+        .padding(12).background(Color.white).cornerRadius(10)
+        .shadow(color: ThemeColors.primaryText.opacity(0.1), radius: 5, y: 2).frame(width: 170)
+    }
+}
+
 struct OnboardingButton: View {
-    let title: String
-    let backgroundColor: Color
-    let textColor: Color
+    let title: String, backgroundColor: Color, textColor: Color
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(textColor)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(backgroundColor)
-                .cornerRadius(12)
-                .shadow(color: backgroundColor.opacity(0.4), radius: 8, y: 4)
-        }
-        .padding(.horizontal, 50)
+            Text(title).font(.headline).fontWeight(.bold).foregroundColor(textColor)
+                .padding().frame(maxWidth: .infinity).background(backgroundColor)
+                .cornerRadius(12).shadow(color: backgroundColor.opacity(0.4), radius: 8, y: 4)
+        }.padding(.horizontal, 50)
     }
 }
 
-// MARK: - Custom Progress Indicator (Redesigned for Visibility)
 struct CustomProgressIndicator: View {
-    let numberOfPages: Int
-    let currentPage: Int
+    let numberOfPages: Int, currentPage: Int
 
     var body: some View {
         HStack(spacing: 12) {
             ForEach(0..<numberOfPages, id: \.self) { index in
                 Circle()
-                    .fill(index == currentPage ? .white : Color.white.opacity(0.4))
+                    .fill(currentPage == index ? ThemeColors.accent : Color.gray.opacity(0.5))
                     .frame(width: 8, height: 8)
-                    .scaleEffect(index == currentPage ? 1.2 : 1.0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: currentPage)
+                    .animation(.spring(), value: currentPage)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.black.opacity(0.3))
-        .clipShape(Capsule())
     }
 }
 

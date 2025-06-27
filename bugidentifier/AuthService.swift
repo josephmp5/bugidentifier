@@ -139,7 +139,7 @@ class AuthService: ObservableObject {
                 "uid": user.uid,
                 "isPremium": false,
                 "subscriptionActive": false,
-                "tokens": 3 // Grant 3 free tokens to new users.
+                "tokens": 1 // Grant 3 free tokens to new users.
             ]
             
             userRef.setData(userData) { error in

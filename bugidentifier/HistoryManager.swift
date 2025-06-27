@@ -42,3 +42,4 @@ class HistoryManager: ObservableObject {
         history.removeAll()
     }
 }
+
