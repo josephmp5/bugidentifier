@@ -15,7 +15,8 @@ struct PaywallView: View {
 
     init(isModal: Bool = false) {
         self.isModal = isModal
-        self._canDismiss = State(initialValue: !isModal)
+        // The close button is initially hidden for the non-modal paywall to enforce a delay.
+        self._canDismiss = State(initialValue: isModal)
     }
 
     let premiumFeatures: [PremiumFeature] = [
@@ -63,7 +64,8 @@ struct PaywallView: View {
                 }
             }
             .onReceive(timer) { _ in
-                if isModal {
+                // This logic now applies the countdown delay to the non-modal paywall.
+                if !isModal {
                     if countdown > 0 {
                         countdown -= 1
                     } else if !canDismiss {
@@ -71,12 +73,14 @@ struct PaywallView: View {
                         timer.upstream.connect().cancel()
                     }
                 } else {
+                    // For modal paywalls, the close button is available immediately.
                     canDismiss = true
                     timer.upstream.connect().cancel()
                 }
             }
             .onAppear {
-                if isModal && !canDismiss {
+                // Start the countdown for the non-modal paywall.
+                if !isModal && !canDismiss {
                     countdown = 5
                 }
             }

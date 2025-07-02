@@ -26,7 +26,7 @@ struct ContentView: View {
                 }
                 .sheet(isPresented: $showPaywall) {
                     // The paywall is presented modally and cannot be dismissed by swiping.
-                    PaywallView(isModal: true)
+                    PaywallView(isModal: false)
                         .interactiveDismissDisabled()
                 }
         } else {
